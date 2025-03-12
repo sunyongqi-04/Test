@@ -1,9 +1,11 @@
 <!DOCTYPE html>
 <html lang="zh">
+// 在head部分添加viewport增强设置
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>小孙食堂</title>
+    // 修改样式部分
     <style>
         body {
             margin: 0;
@@ -271,4 +273,15 @@
         });
     </script>
 </body>
+// 在script部分添加窗口重置检测
+<script>
+    // 添加移动端窗口重置检测
+    function checkMobileResize() {
+        if(window.innerWidth <= 768) {
+            canvas.height = window.innerHeight * 0.8;
+        }
+    }
+    window.addEventListener('resize', checkMobileResize);
+    checkMobileResize();
+</script>
 </html>
