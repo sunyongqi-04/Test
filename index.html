@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>炫酷动态展示</title>
+    <title>小孙食堂</title>
     <style>
         body {
             margin: 0;
             overflow: hidden;
             background: #0a0a0a;
             display: flex;
-            justify-content: center;
+            flex-direction: column;
             align-items: center;
             min-height: 100vh;
         }
@@ -22,8 +22,27 @@
             z-index: -1;
         }
 
+        /* 新增导入按钮定位 */
+        #fileInputLabel {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 100;
+            padding: 8px 15px;  /* 减小内边距 */
+            font-size: 1em;      /* 缩小字号 */
+            width: auto;         /* 取消固定宽度 */
+            border-radius: 25px; /* 微调圆角 */
+        }
+
+        /* 新增按钮悬停动画 */
+        #fileInputLabel:hover {
+            transform: scale(1.02);
+            box-shadow: 0 0 20px rgba(78, 205, 196, 0.6);
+        }
+
         .hero {
             text-align: center;
+            margin-top: 80px;
         }
 
         .dynamic-text {
@@ -46,6 +65,56 @@
             animation: fadeUp 1s ease-out forwards;
         }
 
+        /* 推荐结果容器 */
+        .recommendation {
+            margin: 30px 0;
+            min-height: 60px;
+        }
+
+        .controls {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+            margin-top: 30px;
+        }
+
+        .cyber-button {
+            padding: 15px 30px;
+            width: 220px;
+            border: none;
+            border-radius: 50px;
+            background: linear-gradient(90deg, #ff6b6b, #4ecdc4, #45b7d1);
+            color: white;
+            font-size: 1.2em;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease-in-out;  /* 增强过渡效果 */
+            box-shadow: 0 0 15px rgba(78, 205, 196, 0.3);
+            animation: buttonGlow 2s infinite;
+        }
+
+        .cyber-button:hover {
+            transform: scale(1.05) rotate(1deg);  /* 增加微小旋转 */
+            box-shadow: 0 0 30px rgba(78, 205, 196, 0.6);
+            filter: hue-rotate(15deg);  /* 添加色彩偏移 */
+        }
+
+        /* 原有按钮样式保持不变... */
+
+        #foodList {
+            color: white;
+            margin-top: 20px;
+            max-height: 200px;
+            overflow-y: auto;
+            opacity: 0;
+            animation: fadeUp 0.8s ease-out 0.5s forwards;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+        }
+
         @keyframes glow {
             from { text-shadow: 0 0 10px rgba(78, 205, 196, 0.5); }
             to { text-shadow: 0 0 20px rgba(78, 205, 196, 0.8), 0 0 30px rgba(78, 205, 196, 0.6); }
@@ -57,18 +126,38 @@
                 transform: translateY(0);
             }
         }
+
+        @keyframes buttonGlow {
+            0%, 100% { filter: hue-rotate(0deg); }
+            50% { filter: hue-rotate(45deg); }
+        }
     </style>
 </head>
 <body>
     <canvas id="particles"></canvas>
     
+    <!-- 导入按钮移到body直接子元素 -->
+    <label class="cyber-button" id="fileInputLabel">
+        导入食物列表
+        <input type="file" id="fileInput" hidden accept=".txt">
+    </label>
+
     <div class="hero">
-        <h1 class="dynamic-text">未来科技</h1>
-        <p class="sub-text">Dynamic Visual Experience</p>
+        <h1 class="dynamic-text">小孙食堂</h1>
+        <p class="sub-text">全心为您服务</p>
     </div>
 
+    <!-- 新增推荐结果容器 -->
+    <div class="recommendation">
+        <div id="recommendResult"></div>
+        <div class="controls">
+            <button class="cyber-button" id="recommendBtn">今日美食推荐</button>
+        </div>
+    </div>
+
+    <div id="foodList"></div>
+
     <script>
-        // 粒子动画效果
         const canvas = document.getElementById('particles');
         const ctx = canvas.getContext('2d');
         
@@ -110,7 +199,6 @@
             }
         }
 
-        // 创建粒子数组
         const particles = Array.from({ length: 100 }, () => new Particle());
 
         function animate() {
@@ -125,15 +213,61 @@
         }
         animate();
 
-        // 窗口大小变化处理
         window.addEventListener('resize', () => {
             initCanvas();
             particles.forEach(particle => particle.reset());
         });
 
-        // 添加悬浮效果
-        document.querySelector('.dynamic-text').addEventListener('mouseover', () => {
-            document.documentElement.style.setProperty('--gradient-angle', '135deg');
+        // 美食推荐功能
+        let foods = [
+            '火锅', '麻辣烫', '宫保鸡丁', '鱼香肉丝', '回锅肉',
+            '水煮牛肉', '番茄炒蛋', '糖醋排骨', '红烧肉', '北京烤鸭',
+            '广东早茶', '重庆小面', '兰州拉面', '扬州炒饭', '桂林米粉',
+            '沙县小吃', '黄焖鸡米饭', '台湾卤肉饭', '日式寿司', '韩式烤肉',
+            '石锅拌饭', '部队火锅', '意大利面', '玛格丽特披萨', '牛肉汉堡',
+            '芝士焗饭', '咖喱鸡饭', '海南鸡饭', '港式奶茶', '丝袜奶茶',
+            '菠萝油', '杨枝甘露', '双皮奶', '提拉米苏', '黑森林蛋糕',
+            '抹茶拿铁', '卡布奇诺', '牛肉沙拉', '金枪鱼三明治', '凯撒沙拉',
+            '罗宋汤', '味增汤', '冬阴功汤', '虾饺', '烧卖',
+            '叉烧包', '奶黄包', '肠粉', '章鱼小丸子', '关东煮',
+            '天妇罗', '寿喜烧', '鳗鱼饭', '牛肉丼', '亲子丼',
+            '玉子烧', '豚骨拉面', '凉皮', '肉夹馍', '羊肉泡馍',
+            '驴肉火烧'
+        ];
+        
+        // 修改推荐功能
+        document.getElementById('recommendBtn').addEventListener('click', () => {
+            const result = foods.length > 0 
+                ? `今日推荐：${foods[Math.floor(Math.random() * foods.length)]} 🍴` 
+                : '请先导入食物列表 ➡️';
+            
+            const recommendResult = document.getElementById('recommendResult');
+            recommendResult.innerHTML = `
+                <h2 style="color: #4ecdc4; margin-bottom: 20px;">${result}</h2>
+            `;
+            document.querySelector('.sub-text').style.display = 'none';
+            
+            // 触发粒子特效
+            particles.forEach(p => {
+                p.speed *= 1.5;
+                setTimeout(() => p.speed /= 1.5, 500);
+            });
+        });
+
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file && file.type === 'text/plain') {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    foods = e.target.result.split('\n').filter(f => f.trim());
+                    document.getElementById('foodList').innerHTML = 
+                        `<h3 style="color: #4ecdc4">已加载 ${foods.length} 种美食：</h3>
+                        ${foods.map(f => `<div class="food-item">${f}</div>`).join('')}`;
+                };
+                reader.readAsText(file);
+            } else {
+                alert('请选择有效的txt文件');
+            }
         });
     </script>
 </body>
