@@ -1,0 +1,1382 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>奇奇之家-点餐</title>
+    <!-- Tailwind CSS v3 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <!-- Animate.css -->
+    <link href="https://cdn.jsdelivr.net/npm/animate.css@4.1.1/animate.min.css" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#FF8C42',
+                        secondary: '#4CB9E7',
+                        accent: '#FFBE0B',
+                        light: '#FFF1DC',
+                        dark: '#2C3639',
+                        success: '#38B000',
+                        danger: '#D90429',
+                        warning: '#FFBA08',
+                        info: '#4361EE'
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                    animation: {
+                        'spin-slow': 'spin 3s linear infinite',
+                        'bounce-slow': 'bounce 2s infinite',
+                        'shake': 'shake 0.5s cubic-bezier(.36,.07,.19,.97) both',
+                    },
+                    keyframes: {
+                        shake: {
+                            '10%, 90%': { transform: 'translate3d(-1px, 0, 0)' },
+                            '20%, 80%': { transform: 'translate3d(2px, 0, 0)' },
+                            '30%, 50%, 70%': { transform: 'translate3d(-4px, 0, 0)' },
+                            '40%, 60%': { transform: 'translate3d(4px, 0, 0)' }
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .text-shadow {
+                text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+            }
+            .glass {
+                background: rgba(255, 255, 255, 0.25);
+                backdrop-filter: blur(4px);
+                -webkit-backdrop-filter: blur(4px);
+                border: 1px solid rgba(255, 255, 255, 0.18);
+            }
+            .rotate-y-180 {
+                transform: rotateY(180deg);
+            }
+            .preserve-3d {
+                transform-style: preserve-3d;
+            }
+            .perspective {
+                perspective: 1000px;
+            }
+            .backface-hidden {
+                backface-visibility: hidden;
+            }
+        }
+        
+        /* 自定义样式 */
+        #menu-card-container {
+            perspective: 1000px;
+        }
+        
+        .menu-card {
+            position: relative;
+            width: 100%;
+            min-height: 200px;
+            transition: transform 0.6s;
+            transform-style: preserve-3d;
+        }
+        
+        .menu-card.flipped {
+            transform: rotateY(180deg);
+        }
+        
+        .menu-card-front, .menu-card-back {
+            position: absolute;
+            width: 100%;
+            min-height: 200px;
+            -webkit-backface-visibility: hidden;
+            backface-visibility: hidden;
+            border-radius: 0.75rem; /* 匹配 rounded-xl */
+        }
+        
+        .menu-card-back {
+            transform: rotateY(180deg);
+        }
+        
+        .spin-wheel {
+            transition: transform 3s cubic-bezier(0.1, 0.05, 0.15, 1);
+        }
+        
+        .tag-pill {
+            @apply inline-block px-2 py-1 text-xs font-semibold rounded-full mr-1 mb-1;
+        }
+        
+        .tag-pill.hot {
+            @apply bg-red-100 text-red-800;
+        }
+        
+        .tag-pill.sour {
+            @apply bg-green-100 text-green-800;
+        }
+        
+        .tag-pill.sweet {
+            @apply bg-yellow-100 text-yellow-800;
+        }
+        
+        .tag-pill.salty {
+            @apply bg-blue-100 text-blue-800;
+        }
+        
+        .tag-pill.spicy {
+            @apply bg-orange-100 text-orange-800;
+        }
+        
+        .tag-pill.quick {
+            @apply bg-purple-100 text-purple-800;
+        }
+        
+        .category-btn.active {
+            @apply bg-primary text-white;
+        }
+        
+        /* 加载动画 */
+        .loader {
+            border-top-color: #FF8C42;
+            -webkit-animation: spinner 1.5s linear infinite;
+            animation: spinner 1.5s linear infinite;
+        }
+        
+        @-webkit-keyframes spinner {
+            0% { -webkit-transform: rotate(0deg); }
+            100% { -webkit-transform: rotate(360deg); }
+        }
+        
+        @keyframes spinner {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-light min-h-screen font-sans">
+    <!-- 顶部导航栏 -->
+    <header class="bg-white shadow-md">
+        <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+            <h1 class="text-2xl font-bold text-primary flex items-center">
+                <i class="fa fa-cutlery mr-2"></i>
+                <span>奇奇之家</span>
+            </h1>
+            <button id="theme-toggle" class="p-2 rounded-full hover:bg-gray-100">
+                <i class="fa fa-moon-o text-gray-600"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- 主内容区 -->
+    <main class="container mx-auto px-4 py-6">
+        <!-- 页面导航 -->
+        <nav class="flex mb-6 bg-white rounded-lg shadow-sm overflow-hidden">
+            <button class="nav-btn flex-1 py-3 text-center font-medium transition-colors active" data-target="random-page">
+                <i class="fa fa-random mr-1">随机抽取</i> 
+            </button>
+            <button class="nav-btn flex-1 py-3 text-center font-medium transition-colors" data-target="manage-page">
+                <i class="fa fa-list mr-1">菜单管理</i> 
+            </button>
+            <button class="nav-btn flex-1 py-3 text-center font-medium transition-colors" data-target="import-page">
+                <i class="fa fa-upload mr-1">批量导入</i> 
+            </button>
+            <button class="nav-btn flex-1 py-3 text-center font-medium transition-colors" data-target="history-page">
+                <i class="fa fa-history mr-1">历史记录</i> 
+            </button>
+        </nav>
+
+        <!-- 随机抽取页面 -->
+        <section id="random-page" class="page active">
+            <!-- 分类选择 -->
+            <div class="flex mb-6 bg-white rounded-lg shadow-sm overflow-hidden">
+                <button class="category-btn flex-1 py-3 text-center font-medium transition-colors active" data-category="all">
+                    全部
+                </button>
+                <button class="category-btn flex-1 py-3 text-center font-medium transition-colors" data-category="breakfast">
+                    <i class="fa fa-coffee mr-1"> 早餐</i>
+                </button>
+                <button class="category-btn flex-1 py-3 text-center font-medium transition-colors" data-category="lunch">
+                    <i class="fa fa-cutlery mr-1"> 午餐</i>
+                </button>
+                <button class="category-btn flex-1 py-3 text-center font-medium transition-colors" data-category="dinner">
+                    <i class="fa fa-moon-o mr-1"> 晚餐</i>
+                </button>
+            </div>
+
+            <!-- 抽取数量选择 -->
+            <div class="mb-6 flex flex-col items-center">
+                <label for="extract-count" class="text-gray-700 font-medium mb-2">抽取数量：</label>
+                <div class="flex items-center space-x-4">
+                    <button id="decrease-count" class="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-700 hover:bg-gray-300 transition-colors">
+                        <i class="fa fa-minus"></i>
+                    </button>
+                    <input type="number" id="extract-count" min="1" max="10" value="1" class="w-16 text-center text-xl font-bold border-0 focus:ring-0">
+                    <button id="increase-count" class="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-700 hover:bg-gray-300 transition-colors">
+                        <i class="fa fa-plus"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 操作按钮 -->
+            <div class="flex justify-center mb-6">
+                <button id="random-btn" class="bg-primary hover:bg-primary/90 text-white font-bold py-4 px-8 rounded-full shadow-lg transition-all transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-opacity-50">
+                    <i class="fa fa-random mr-2"></i> 开始抽取
+                </button>
+            </div>
+
+            <!-- 抽取区域 -->
+            <div class="perspective">
+                <div id="menu-card-container" class="relative w-full min-h-[200px] max-h-[80vh] mx-auto animate__animated animate__bounceIn">
+                    <div id="menu-card" class="menu-card w-full min-h-[200px] bg-white rounded-xl shadow-lg">
+                        <!-- 卡片正面 -->
+                        <div class="menu-card-front flex flex-col items-center justify-center p-6 min-h-[200px] bg-white rounded-xl">
+                            <div class="text-6xl mb-4 text-primary">
+                                <i class="fa fa-cutlery"></i>
+                            </div>
+                            <h2 class="text-2xl font-bold text-gray-800 mb-2">准备抽取菜单</h2>
+                            <p class="text-gray-600 text-center">点击上方按钮开始随机抽取今日菜单</p>
+                        </div>
+                        
+                        <!-- 卡片背面 -->
+                        <div class="menu-card-back flex flex-col items-center justify-start p-6 bg-primary rounded-xl min-h-full">
+                            <div class="w-full flex justify-between items-center mb-4">
+                                <h3 class="text-xl font-bold text-white text-shadow">抽取结果</h3>
+                                <button id="quick-reroll-btn" class="bg-white bg-opacity-20 hover:bg-opacity-30 text-white font-medium py-1 px-3 rounded-lg text-sm transition-all">
+                                    <i class="fa fa-refresh mr-1"></i> 再抽一次
+                                </button>
+                            </div>
+                            <div id="results-container" class="w-full space-y-4">
+                                <!-- 多菜品结果将在这里动态生成 -->
+                                <div id="single-result" class="flex flex-col items-center">
+                                    <h2 id="result-name" class="text-3xl font-bold text-white mb-4 text-center text-shadow"></h2>
+                                    <div id="result-tags" class="flex flex-wrap justify-center mb-4"></div>
+                                    <div id="result-category" class="text-white text-sm opacity-80"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 菜单管理页面 -->
+        <section id="manage-page" class="page hidden">
+            <!-- 添加菜品按钮 -->
+            <div class="mb-6 flex justify-between items-center">
+                <h2 class="text-xl font-bold text-gray-800">菜单管理</h2>
+                <button id="add-menu-btn" class="bg-primary hover:bg-primary/90 text-white font-bold py-2 px-4 rounded-lg shadow transition-all">
+                    <i class="fa fa-plus mr-1"></i> 添加菜品
+                </button>
+            </div>
+
+            <!-- 搜索框 -->
+            <div class="mb-6">
+                <div class="relative">
+                    <input type="text" id="search-input" placeholder="搜索菜品..." class="w-full py-3 px-4 pr-10 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+                    <div class="absolute right-3 top-3 text-gray-400">
+                        <i class="fa fa-search"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 菜单列表 -->
+            <div id="menu-list" class="space-y-4">
+                <!-- 菜单项将通过JavaScript动态生成 -->
+            </div>
+        </section>
+
+        <!-- 批量导入页面 -->
+        <section id="import-page" class="page hidden">
+            <h2 class="text-xl font-bold text-gray-800 mb-6">批量导入菜单</h2>
+            
+            <!-- 导入说明 -->
+            <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
+                <div class="flex">
+                    <div class="flex-shrink-0">
+                        <i class="fa fa-info-circle text-blue-500"></i>
+                    </div>
+                    <div class="ml-3">
+                        <p class="text-sm text-blue-700">
+                            请按照以下格式输入菜品信息，每行一个菜品：<br>
+                            <code>菜品名称,分类(breakfast/lunch/dinner),标签1,标签2...</code><br>
+                            例如：<code>红烧肉,dinner,肉类,红烧</code>
+                        </p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 导入文本框 -->
+            <div class="mb-6">
+                <textarea id="import-textarea" rows="10" class="w-full p-4 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="请输入菜品信息..."></textarea>
+            </div>
+            
+            <!-- 操作按钮 -->
+            <div class="flex justify-between">
+                <button id="clear-import-btn" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg shadow transition-all">
+                    <i class="fa fa-trash mr-1"></i> 清空
+                </button>
+                <button id="import-btn" class="bg-primary hover:bg-primary/90 text-white font-bold py-2 px-4 rounded-lg shadow transition-all">
+                    <i class="fa fa-upload mr-1"></i> 开始导入
+                </button>
+            </div>
+        </section>
+
+        <!-- 历史记录页面 -->
+        <section id="history-page" class="page hidden">
+            <h2 class="text-xl font-bold text-gray-800 mb-6">历史记录</h2>
+            
+            <!-- 历史记录列表 -->
+            <div id="history-list" class="space-y-4">
+                <!-- 历史记录将通过JavaScript动态生成 -->
+            </div>
+            
+            <!-- 清空历史按钮 -->
+            <div class="mt-6 flex justify-center">
+                <button id="clear-history-btn" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg shadow transition-all">
+                    <i class="fa fa-trash mr-1"></i> 清空历史记录
+                </button>
+            </div>
+        </section>
+    </main>
+
+    <!-- 添加/编辑菜品模态框 -->
+    <div id="menu-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden">
+        <div class="bg-white rounded-xl shadow-xl p-6 w-full max-w-md mx-4 animate__animated animate__fadeIn">
+            <div class="flex justify-between items-center mb-6">
+                <h3 id="modal-title" class="text-xl font-bold text-gray-800">添加菜品</h3>
+                <button id="close-modal" class="text-gray-500 hover:text-gray-700">
+                    <i class="fa fa-times"></i>
+                </button>
+            </div>
+            
+            <form id="menu-form">
+                <input type="hidden" id="menu-id">
+                
+                <div class="mb-4">
+                    <label for="menu-name" class="block text-gray-700 text-sm font-bold mb-2">菜品名称</label>
+                    <input type="text" id="menu-name" class="w-full p-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent" required>
+                </div>
+                
+                <div class="mb-4">
+                    <label for="menu-category" class="block text-gray-700 text-sm font-bold mb-2">分类</label>
+                    <select id="menu-category" class="w-full p-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent" required>
+                        <option value="breakfast">早餐</option>
+                        <option value="lunch">午餐</option>
+                        <option value="dinner">晚餐</option>
+                    </select>
+                </div>
+                
+                <div class="mb-6">
+                    <label for="menu-tags" class="block text-gray-700 text-sm font-bold mb-2">标签 (用逗号分隔)</label>
+                    <input type="text" id="menu-tags" placeholder="例如: 肉类,红烧,辣" class="w-full p-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+                </div>
+                
+                <div class="flex justify-end">
+                    <button type="button" id="cancel-menu" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg shadow transition-all mr-3">
+                        取消
+                    </button>
+                    <button type="submit" class="bg-primary hover:bg-primary/90 text-white font-bold py-2 px-4 rounded-lg shadow transition-all">
+                        保存
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 确认对话框 -->
+    <div id="confirm-dialog" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden">
+        <div class="bg-white rounded-xl shadow-xl p-6 w-full max-w-sm mx-4 animate__animated animate__fadeIn">
+            <h3 id="confirm-title" class="text-xl font-bold text-gray-800 mb-4">确认操作</h3>
+            <p id="confirm-message" class="text-gray-600 mb-6"></p>
+            
+            <div class="flex justify-end">
+                <button id="confirm-cancel" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg shadow transition-all mr-3">
+                    取消
+                </button>
+                <button id="confirm-ok" class="bg-danger hover:bg-danger/90 text-white font-bold py-2 px-4 rounded-lg shadow transition-all">
+                    确认
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 提示消息 -->
+    <div id="toast" class="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-4 py-2 rounded-lg shadow-lg z-50 hidden animate__animated">
+        <span id="toast-message"></span>
+    </div>
+
+    <script>
+        // 应用状态
+        const AppState = {
+            menus: [],
+            history: [],
+            currentCategory: 'all',
+            currentEditId: null,
+            confirmCallback: null
+        };
+
+        // 初始化应用
+        function initApp() {
+            loadData();
+            console.log('初始化时的菜品数据:', AppState.menus);
+            setupEventListeners();
+            renderMenuList();
+            renderHistoryList();
+            // 添加一些默认菜品（如果没有数据）
+            if (AppState.menus.length === 0) {
+                addDefaultMenus();
+                console.log('添加默认菜品后:', AppState.menus);
+            }
+        }
+
+        // 加载数据
+        function loadData() {
+            const savedMenus = localStorage.getItem('menuRandomizer_menus');
+            const savedHistory = localStorage.getItem('menuRandomizer_history');
+            
+            if (savedMenus) {
+                AppState.menus = JSON.parse(savedMenus);
+            }
+            
+            if (savedHistory) {
+                AppState.history = JSON.parse(savedHistory);
+            }
+        }
+
+        // 保存数据
+        function saveData() {
+            localStorage.setItem('menuRandomizer_menus', JSON.stringify(AppState.menus));
+            localStorage.setItem('menuRandomizer_history', JSON.stringify(AppState.history));
+        }
+
+        // 添加默认菜品
+        function addDefaultMenus() {
+            const defaultMenus = [
+                { name: '包子', category: 'breakfast', tags: ['面食', '传统'] },
+                { name: '油条', category: 'breakfast', tags: ['油炸', '传统'] },
+                { name: '豆浆', category: 'breakfast', tags: ['饮品', '传统'] },
+                { name: '牛奶', category: 'breakfast', tags: ['饮品', '营养'] },
+                { name: '鸡蛋', category: 'breakfast', tags: ['蛋类', '营养'] },
+                { name: '红烧肉', category: 'lunch', tags: ['肉类', '红烧', '油腻'] },
+                { name: '宫保鸡丁', category: 'lunch', tags: ['肉类', '辣', '川菜'] },
+                { name: '鱼香肉丝', category: 'lunch', tags: ['肉类', '辣', '川菜'] },
+                { name: '西红柿炒蛋', category: 'lunch', tags: ['蛋类', '家常菜', '酸甜'] },
+                { name: '清炒时蔬', category: 'lunch', tags: ['蔬菜', '清淡'] },
+                { name: '糖醋排骨', category: 'dinner', tags: ['肉类', '糖醋', '家常菜'] },
+                { name: '麻婆豆腐', category: 'dinner', tags: ['豆制品', '辣', '川菜'] },
+                { name: '清蒸鱼', category: 'dinner', tags: ['鱼类', '清淡', '营养'] },
+                { name: '炒青菜', category: 'dinner', tags: ['蔬菜', '清淡'] },
+                { name: '紫菜蛋汤', category: 'dinner', tags: ['汤类', '清淡', '营养'] }
+            ];
+
+            console.log('开始添加默认菜品...');
+            defaultMenus.forEach(menu => {
+                // 直接添加到AppState.menus，确保有ID
+                const newMenu = {
+                    id: generateId(),
+                    name: menu.name,
+                    category: menu.category,
+                    tags: menu.tags,
+                    createdAt: Date.now(),
+                    updatedAt: Date.now()
+                };
+                AppState.menus.push(newMenu);
+                console.log('添加菜品:', newMenu);
+            });
+            
+            saveData();
+            showToast('已添加默认菜品示例');
+            console.log('默认菜品添加完成，当前菜品数量:', AppState.menus.length);
+        }
+
+        // 设置事件监听器
+        function setupEventListeners() {
+            // 页面导航
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const target = btn.dataset.target;
+                    switchPage(target);
+                });
+            });
+
+            // 分类选择
+            document.querySelectorAll('.category-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const category = btn.dataset.category;
+                    setCurrentCategory(category);
+                });
+            });
+
+            // 随机抽取按钮
+            document.getElementById('random-btn').addEventListener('click', randomMenu);
+            
+            // 抽取数量控制
+            document.getElementById('decrease-count').addEventListener('click', () => {
+                const countInput = document.getElementById('extract-count');
+                let count = parseInt(countInput.value);
+                if (count > 1) {
+                    countInput.value = count - 1;
+                }
+            });
+            
+            document.getElementById('increase-count').addEventListener('click', () => {
+                const countInput = document.getElementById('extract-count');
+                let count = parseInt(countInput.value);
+                const maxCount = 10; // 最大抽取数量
+                if (count < maxCount) {
+                    countInput.value = count + 1;
+                }
+            });
+            
+            // 限制输入范围
+            document.getElementById('extract-count').addEventListener('change', (e) => {
+                let count = parseInt(e.target.value);
+                if (isNaN(count) || count < 1) {
+                    e.target.value = 1;
+                } else if (count > 10) {
+                    e.target.value = 10;
+                }
+            });
+            
+            // 卡片背面的再抽一次按钮
+            document.getElementById('quick-reroll-btn').addEventListener('click', () => {
+                // 直接调用随机抽取函数
+                randomMenu();
+            });
+
+            // 添加菜品按钮
+            document.getElementById('add-menu-btn').addEventListener('click', () => {
+                openMenuModal();
+            });
+
+            // 关闭模态框
+            document.getElementById('close-modal').addEventListener('click', closeMenuModal);
+            document.getElementById('cancel-menu').addEventListener('click', closeMenuModal);
+
+            // 菜单表单提交
+            document.getElementById('menu-form').addEventListener('submit', (e) => {
+                e.preventDefault();
+                saveMenu();
+            });
+
+            // 搜索框
+            document.getElementById('search-input').addEventListener('input', (e) => {
+                const searchTerm = e.target.value.toLowerCase();
+                filterMenuList(searchTerm);
+            });
+
+            // 批量导入
+            document.getElementById('import-btn').addEventListener('click', importMenus);
+            document.getElementById('clear-import-btn').addEventListener('click', () => {
+                document.getElementById('import-textarea').value = '';
+            });
+
+            // 清空历史记录
+            document.getElementById('clear-history-btn').addEventListener('click', () => {
+                showConfirmDialog('清空历史记录', '确定要清空所有历史记录吗？此操作不可恢复。', () => {
+                    AppState.history = [];
+                    saveData();
+                    renderHistoryList();
+                    showToast('历史记录已清空');
+                });
+            });
+
+            // 确认对话框
+            document.getElementById('confirm-cancel').addEventListener('click', closeConfirmDialog);
+            document.getElementById('confirm-ok').addEventListener('click', () => {
+                if (AppState.confirmCallback) {
+                    AppState.confirmCallback();
+                }
+                closeConfirmDialog();
+            });
+
+            // 主题切换
+            document.getElementById('theme-toggle').addEventListener('click', toggleTheme);
+        }
+
+        // 切换页面
+        function switchPage(pageId) {
+            // 更新导航按钮状态
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                if (btn.dataset.target === pageId) {
+                    btn.classList.add('active', 'text-primary', 'border-b-2', 'border-primary');
+                } else {
+                    btn.classList.remove('active', 'text-primary', 'border-b-2', 'border-primary');
+                }
+            });
+
+            // 显示目标页面，隐藏其他页面
+            document.querySelectorAll('.page').forEach(page => {
+                if (page.id === pageId) {
+                    page.classList.remove('hidden');
+                    page.classList.add('active');
+                } else {
+                    page.classList.add('hidden');
+                    page.classList.remove('active');
+                }
+            });
+
+            // 如果切换到管理页面，重新渲染列表
+            if (pageId === 'manage-page') {
+                renderMenuList();
+            }
+
+            // 如果切换到历史页面，重新渲染历史记录
+            if (pageId === 'history-page') {
+                renderHistoryList();
+            }
+        }
+
+        // 设置当前分类
+        function setCurrentCategory(category) {
+            AppState.currentCategory = category;
+
+            // 更新分类按钮状态
+            document.querySelectorAll('.category-btn').forEach(btn => {
+                if (btn.dataset.category === category) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+        }
+
+        // 随机抽取菜单
+        function randomMenu() {
+            const randomBtn = document.getElementById('random-btn');
+            const menuCard = document.getElementById('menu-card');
+            const extractCount = parseInt(document.getElementById('extract-count').value);
+            
+            // 禁用按钮
+            randomBtn.disabled = true;
+            randomBtn.innerHTML = '<i class="fa fa-spinner fa-spin mr-2"></i> 抽取中...';
+            
+            // 重置卡片
+            menuCard.classList.remove('flipped');
+            
+            // 获取当前分类的菜单
+            let filteredMenus = AppState.menus;
+            if (AppState.currentCategory !== 'all') {
+                filteredMenus = AppState.menus.filter(menu => menu.category === AppState.currentCategory);
+            }
+
+            // 检查是否有菜品
+            if (filteredMenus.length === 0) {
+                showToast('当前分类下没有菜品，请先添加菜品');
+                randomBtn.disabled = false;
+                randomBtn.innerHTML = '<i class="fa fa-random mr-2"></i> 开始抽取';
+                return;
+            }
+
+            // 检查抽取数量是否超过可用菜品数量
+            if (extractCount > filteredMenus.length) {
+                showToast(`当前分类下只有 ${filteredMenus.length} 个菜品，无法抽取 ${extractCount} 个菜品`);
+                // 恢复按钮状态
+                randomBtn.disabled = false;
+                randomBtn.innerHTML = '<i class="fa fa-random mr-2"></i> 开始抽取';
+                return;
+            }
+
+            // 避免重复抽取最近的菜品
+            let recentIds = [];
+            //if (AppState.history.length > 0) {
+                //recentIds = AppState.history.slice(-5).map(item => item.id);
+            //}
+
+            // 过滤掉最近抽取的菜品
+            let availableMenus = filteredMenus.filter(menu => !recentIds.includes(menu.id));
+            
+            // 如果可用菜品不足，则使用所有菜品
+            if (availableMenus.length < extractCount) {
+                availableMenus = filteredMenus;
+            }
+
+            // 随机抽取多个菜品（不重复）
+            const selectedMenus = [];
+            const tempAvailable = [...availableMenus];
+            
+            for (let i = 0; i < extractCount; i++) {
+                const randomIndex = Math.floor(Math.random() * tempAvailable.length);
+                const selectedMenu = tempAvailable[randomIndex];
+                selectedMenus.push(selectedMenu);
+                tempAvailable.splice(randomIndex, 1); // 从临时数组中移除已选中的菜品
+            }
+
+            console.log('抽取到的菜品:', selectedMenus);
+
+            
+
+            // 添加翻转动画
+            setTimeout(() => {
+                menuCard.classList.add('flipped');
+                
+                // 添加到历史记录
+                selectedMenus.forEach(menu => {
+                    addToHistory(menu);
+                });
+                
+                // 恢复按钮状态
+                setTimeout(() => {
+                    randomBtn.disabled = false;
+                    randomBtn.innerHTML = '<i class="fa fa-random mr-2"></i> 再抽一次';
+                }, 600);
+					// 更新结果显示
+            updateResultsDisplay(selectedMenus);
+            }, 500);
+		
+        }
+
+        // 更新结果显示
+        function updateResultsDisplay(selectedMenus) {
+            const resultsContainer = document.getElementById('results-container');
+            const singleResult = document.getElementById('single-result');
+            
+            // 如果只抽取一个菜品，使用原来的显示方式
+            if (selectedMenus.length === 1) {
+                const selectedMenu = selectedMenus[0];
+                
+                // 显示单个结果容器
+                singleResult.style.display = 'flex';
+                
+                // 更新单个结果
+                document.getElementById('result-name').textContent = selectedMenu.name;
+                
+                // 清空并更新标签
+                const tagsContainer = document.getElementById('result-tags');
+                tagsContainer.innerHTML = '';
+                
+                if (selectedMenu.tags && selectedMenu.tags.length > 0) {
+                    selectedMenu.tags.forEach(tag => {
+                        const tagElement = document.createElement('span');
+                        tagElement.className = `tag-pill ${getTagClass(tag)}`;
+                        tagElement.textContent = tag;
+                        tagsContainer.appendChild(tagElement);
+                    });
+                }
+                
+                // 设置分类
+                const categoryText = getCategoryText(selectedMenu.category);
+                document.getElementById('result-category').textContent = categoryText;
+                
+                // 移除可能存在的多个结果
+                const multiResults = document.querySelectorAll('.multi-result-item');
+                multiResults.forEach(item => item.remove());
+                
+            } else {
+                // 隐藏单个结果容器
+                singleResult.style.display = 'none';
+                
+                // 移除可能存在的多个结果
+                const multiResults = document.querySelectorAll('.multi-result-item');
+                multiResults.forEach(item => item.remove());
+                
+                // 为每个菜品创建结果项
+                selectedMenus.forEach((menu, index) => {
+                    const resultItem = document.createElement('div');
+                    resultItem.className = 'multi-result-item bg-white bg-opacity-20 rounded-lg p-4 w-full';
+                    
+                    // 创建菜品名称
+                    const nameElement = document.createElement('h3');
+                    nameElement.className = 'text-xl font-bold text-white mb-2';
+                    nameElement.textContent = `${index + 1}. ${menu.name}`;
+                    
+                    // 创建标签容器
+                    const tagsContainer = document.createElement('div');
+                    tagsContainer.className = 'flex flex-wrap justify-center mb-2';
+                    
+                    // 添加标签
+                    if (menu.tags && menu.tags.length > 0) {
+                        menu.tags.forEach(tag => {
+                            const tagElement = document.createElement('span');
+                            tagElement.className = `tag-pill ${getTagClass(tag)}`;
+                            tagElement.textContent = tag;
+                            tagsContainer.appendChild(tagElement);
+                        });
+                    }
+                    
+                    // 创建分类
+                    const categoryElement = document.createElement('div');
+                    categoryElement.className = 'text-white text-sm opacity-80 text-center';
+                    categoryElement.textContent = getCategoryText(menu.category);
+                    
+                    // 组装结果项
+                    resultItem.appendChild(nameElement);
+                    resultItem.appendChild(tagsContainer);
+                    resultItem.appendChild(categoryElement);
+                    
+                    // 添加到容器
+                    resultsContainer.appendChild(resultItem);
+                });
+            }
+        }
+
+        // 获取标签样式类
+        function getTagClass(tag) {
+            const tagLower = tag.toLowerCase();
+            if (tagLower.includes('辣') || tagLower.includes(' spicy')) return 'spicy';
+            if (tagLower.includes('甜') || tagLower.includes('sweet')) return 'sweet';
+            if (tagLower.includes('酸') || tagLower.includes('sour')) return 'sour';
+            if (tagLower.includes('咸') || tagLower.includes('salty')) return 'salty';
+            if (tagLower.includes('热') || tagLower.includes('hot')) return 'hot';
+            if (tagLower.includes('快') || tagLower.includes('quick')) return 'quick';
+            return '';
+        }
+
+        // 获取分类文本
+        function getCategoryText(category) {
+            switch (category) {
+                case 'breakfast': return '早餐';
+                case 'lunch': return '午餐';
+                case 'dinner': return '晚餐';
+                default: return '';
+            }
+        }
+
+        // 添加到历史记录
+        function addToHistory(menu) {
+            const historyItem = {
+                id: menu.id,
+                name: menu.name,
+                category: menu.category,
+                tags: menu.tags,
+                timestamp: Date.now()
+            };
+
+            AppState.history.unshift(historyItem);
+            
+            // 限制历史记录数量
+            if (AppState.history.length > 50) {
+                AppState.history = AppState.history.slice(0, 50);
+            }
+
+            saveData();
+            renderHistoryList();
+        }
+
+        // 打开菜单模态框
+        function openMenuModal(menuId = null) {
+            const modal = document.getElementById('menu-modal');
+            const title = document.getElementById('modal-title');
+            const form = document.getElementById('menu-form');
+            
+            // 重置表单
+            form.reset();
+            document.getElementById('menu-id').value = '';
+            AppState.currentEditId = null;
+            
+            if (menuId) {
+                // 编辑模式
+                const menu = AppState.menus.find(m => m.id === menuId);
+                if (menu) {
+                    title.textContent = '编辑菜品';
+                    document.getElementById('menu-id').value = menu.id;
+                    document.getElementById('menu-name').value = menu.name;
+                    document.getElementById('menu-category').value = menu.category;
+                    document.getElementById('menu-tags').value = menu.tags.join(', ');
+                    AppState.currentEditId = menuId;
+                }
+            } else {
+                // 添加模式
+                title.textContent = '添加菜品';
+            }
+            
+            modal.classList.remove('hidden');
+        }
+
+        // 关闭菜单模态框
+        function closeMenuModal() {
+            const modal = document.getElementById('menu-modal');
+            modal.classList.add('hidden');
+        }
+
+        // 保存菜单
+        function saveMenu() {
+            const id = document.getElementById('menu-id').value;
+            const name = document.getElementById('menu-name').value.trim();
+            const category = document.getElementById('menu-category').value;
+            const tagsInput = document.getElementById('menu-tags').value.trim();
+            
+            // 验证输入
+            if (!name) {
+                showToast('请输入菜品名称');
+                return;
+            }
+            
+            // 处理标签
+            let tags = [];
+            if (tagsInput) {
+                tags = tagsInput.split(',').map(tag => tag.trim()).filter(tag => tag);
+            }
+            
+            if (AppState.currentEditId) {
+                // 更新现有菜品
+                updateMenu(AppState.currentEditId, name, category, tags);
+            } else {
+                // 添加新菜品
+                addMenu(name, category, tags);
+            }
+            
+            closeMenuModal();
+            renderMenuList();
+        }
+
+        // 添加菜品
+        function addMenu(name, category, tags = []) {
+            const menu = {
+                id: generateId(),
+                name,
+                category,
+                tags,
+                createdAt: Date.now(),
+                updatedAt: Date.now()
+            };
+            
+            AppState.menus.push(menu);
+            saveData();
+            
+            showToast('菜品添加成功');
+        }
+
+        // 更新菜品
+        function updateMenu(id, name, category, tags) {
+            const menuIndex = AppState.menus.findIndex(m => m.id === id);
+            if (menuIndex !== -1) {
+                AppState.menus[menuIndex] = {
+                    ...AppState.menus[menuIndex],
+                    name,
+                    category,
+                    tags,
+                    updatedAt: Date.now()
+                };
+                
+                saveData();
+                showToast('菜品更新成功');
+            }
+        }
+
+        // 删除菜品
+        function deleteMenu(id) {
+            showConfirmDialog('删除菜品', '确定要删除这个菜品吗？此操作不可恢复。', () => {
+                const menuIndex = AppState.menus.findIndex(m => m.id === id);
+                if (menuIndex !== -1) {
+                    AppState.menus.splice(menuIndex, 1);
+                    saveData();
+                    renderMenuList();
+                    showToast('菜品已删除');
+                }
+            });
+        }
+
+        // 渲染菜单列表
+        function renderMenuList() {
+            const menuList = document.getElementById('menu-list');
+            menuList.innerHTML = '';
+            
+            if (AppState.menus.length === 0) {
+                menuList.innerHTML = `
+                    <div class="text-center py-8 text-gray-500">
+                        <i class="fa fa-info-circle text-2xl mb-2"></i>
+                        <p>暂无菜品，请添加菜品</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            AppState.menus.forEach(menu => {
+                const menuItem = document.createElement('div');
+                menuItem.className = 'bg-white rounded-lg shadow-sm p-4 flex justify-between items-center';
+                
+                // 菜品信息
+                const infoDiv = document.createElement('div');
+                infoDiv.className = 'flex-1';
+                
+                // 菜品名称和分类
+                const nameDiv = document.createElement('div');
+                nameDiv.className = 'flex items-center mb-2';
+                
+                const nameSpan = document.createElement('h3');
+                nameSpan.className = 'text-lg font-bold text-gray-800';
+                nameSpan.textContent = menu.name;
+                
+                const categorySpan = document.createElement('span');
+                categorySpan.className = 'ml-2 text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-600';
+                categorySpan.textContent = getCategoryText(menu.category);
+                
+                nameDiv.appendChild(nameSpan);
+                nameDiv.appendChild(categorySpan);
+                
+                // 标签
+                const tagsDiv = document.createElement('div');
+                tagsDiv.className = 'flex flex-wrap';
+                
+                if (menu.tags && menu.tags.length > 0) {
+                    menu.tags.forEach(tag => {
+                        const tagSpan = document.createElement('span');
+                        tagSpan.className = `tag-pill ${getTagClass(tag)}`;
+                        tagSpan.textContent = tag;
+                        tagsDiv.appendChild(tagSpan);
+                    });
+                }
+                
+                infoDiv.appendChild(nameDiv);
+                infoDiv.appendChild(tagsDiv);
+                
+                // 操作按钮
+                const actionsDiv = document.createElement('div');
+                actionsDiv.className = 'flex space-x-2';
+                
+                const editBtn = document.createElement('button');
+                editBtn.className = 'p-2 text-gray-500 hover:text-primary';
+                editBtn.innerHTML = '<i class="fa fa-pencil"></i>';
+                editBtn.addEventListener('click', () => {
+                    openMenuModal(menu.id);
+                });
+                
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'p-2 text-gray-500 hover:text-danger';
+                deleteBtn.innerHTML = '<i class="fa fa-trash"></i>';
+                deleteBtn.addEventListener('click', () => {
+                    deleteMenu(menu.id);
+                });
+                
+                actionsDiv.appendChild(editBtn);
+                actionsDiv.appendChild(deleteBtn);
+                
+                menuItem.appendChild(infoDiv);
+                menuItem.appendChild(actionsDiv);
+                
+                menuList.appendChild(menuItem);
+            });
+        }
+
+        // 过滤菜单列表
+        function filterMenuList(searchTerm) {
+            const menuList = document.getElementById('menu-list');
+            menuList.innerHTML = '';
+            
+            if (!searchTerm) {
+                renderMenuList();
+                return;
+            }
+            
+            const filteredMenus = AppState.menus.filter(menu => {
+                // 搜索名称
+                if (menu.name.toLowerCase().includes(searchTerm)) {
+                    return true;
+                }
+                
+                // 搜索标签
+                if (menu.tags.some(tag => tag.toLowerCase().includes(searchTerm))) {
+                    return true;
+                }
+                
+                // 搜索分类
+                if (getCategoryText(menu.category).toLowerCase().includes(searchTerm)) {
+                    return true;
+                }
+                
+                return false;
+            });
+            
+            if (filteredMenus.length === 0) {
+                menuList.innerHTML = `
+                    <div class="text-center py-8 text-gray-500">
+                        <i class="fa fa-search text-2xl mb-2"></i>
+                        <p>没有找到匹配的菜品</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            filteredMenus.forEach(menu => {
+                const menuItem = document.createElement('div');
+                menuItem.className = 'bg-white rounded-lg shadow-sm p-4 flex justify-between items-center';
+                
+                // 菜品信息
+                const infoDiv = document.createElement('div');
+                infoDiv.className = 'flex-1';
+                
+                // 菜品名称和分类
+                const nameDiv = document.createElement('div');
+                nameDiv.className = 'flex items-center mb-2';
+                
+                const nameSpan = document.createElement('h3');
+                nameSpan.className = 'text-lg font-bold text-gray-800';
+                nameSpan.textContent = menu.name;
+                
+                const categorySpan = document.createElement('span');
+                categorySpan.className = 'ml-2 text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-600';
+                categorySpan.textContent = getCategoryText(menu.category);
+                
+                nameDiv.appendChild(nameSpan);
+                nameDiv.appendChild(categorySpan);
+                
+                // 标签
+                const tagsDiv = document.createElement('div');
+                tagsDiv.className = 'flex flex-wrap';
+                
+                if (menu.tags && menu.tags.length > 0) {
+                    menu.tags.forEach(tag => {
+                        const tagSpan = document.createElement('span');
+                        tagSpan.className = `tag-pill ${getTagClass(tag)}`;
+                        tagSpan.textContent = tag;
+                        tagsDiv.appendChild(tagSpan);
+                    });
+                }
+                
+                infoDiv.appendChild(nameDiv);
+                infoDiv.appendChild(tagsDiv);
+                
+                // 操作按钮
+                const actionsDiv = document.createElement('div');
+                actionsDiv.className = 'flex space-x-2';
+                
+                const editBtn = document.createElement('button');
+                editBtn.className = 'p-2 text-gray-500 hover:text-primary';
+                editBtn.innerHTML = '<i class="fa fa-pencil"></i>';
+                editBtn.addEventListener('click', () => {
+                    openMenuModal(menu.id);
+                });
+                
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'p-2 text-gray-500 hover:text-danger';
+                deleteBtn.innerHTML = '<i class="fa fa-trash"></i>';
+                deleteBtn.addEventListener('click', () => {
+                    deleteMenu(menu.id);
+                });
+                
+                actionsDiv.appendChild(editBtn);
+                actionsDiv.appendChild(deleteBtn);
+                
+                menuItem.appendChild(infoDiv);
+                menuItem.appendChild(actionsDiv);
+                
+                menuList.appendChild(menuItem);
+            });
+        }
+
+        // 批量导入菜品
+        function importMenus() {
+            const textarea = document.getElementById('import-textarea');
+            const text = textarea.value.trim();
+            
+            if (!text) {
+                showToast('请输入菜品信息');
+                return;
+            }
+            
+            const lines = text.split('\n');
+            let successCount = 0;
+            let errorCount = 0;
+            
+            lines.forEach(line => {
+                line = line.trim();
+                if (!line) return;
+                
+                try {
+                    const parts = line.split(',');
+                    if (parts.length < 2) {
+                        errorCount++;
+                        return;
+                    }
+                    
+                    const name = parts[0].trim();
+                    const category = parts[1].trim().toLowerCase();
+                    
+                    // 验证分类
+                    if (!['breakfast', 'lunch', 'dinner'].includes(category)) {
+                        errorCount++;
+                        return;
+                    }
+                    
+                    // 处理标签
+                    let tags = [];
+                    if (parts.length > 2) {
+                        tags = parts.slice(2).map(tag => tag.trim()).filter(tag => tag);
+                    }
+                    
+                    addMenu(name, category, tags);
+                    successCount++;
+                } catch (e) {
+                    errorCount++;
+                }
+            });
+            
+            // 清空输入框
+            textarea.value = '';
+            
+            // 显示结果
+            let message = `成功导入 ${successCount} 个菜品`;
+            if (errorCount > 0) {
+                message += `，失败 ${errorCount} 个`;
+            }
+            
+            showToast(message);
+            
+            // 重新渲染菜单列表
+            renderMenuList();
+        }
+
+        // 渲染历史记录列表
+        function renderHistoryList() {
+            const historyList = document.getElementById('history-list');
+            historyList.innerHTML = '';
+            
+            if (AppState.history.length === 0) {
+                historyList.innerHTML = `
+                    <div class="text-center py-8 text-gray-500">
+                        <i class="fa fa-history text-2xl mb-2"></i>
+                        <p>暂无历史记录</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            AppState.history.forEach(item => {
+                const historyItem = document.createElement('div');
+                historyItem.className = 'bg-white rounded-lg shadow-sm p-4';
+                
+                // 菜品名称和时间
+                const headerDiv = document.createElement('div');
+                headerDiv.className = 'flex justify-between items-center mb-2';
+                
+                const nameSpan = document.createElement('h3');
+                nameSpan.className = 'text-lg font-bold text-gray-800';
+                nameSpan.textContent = item.name;
+                
+                const timeSpan = document.createElement('span');
+                timeSpan.className = 'text-xs text-gray-500';
+                timeSpan.textContent = formatDate(item.timestamp);
+                
+                headerDiv.appendChild(nameSpan);
+                headerDiv.appendChild(timeSpan);
+                
+                // 分类和标签
+                const infoDiv = document.createElement('div');
+                infoDiv.className = 'flex flex-wrap items-center';
+                
+                const categorySpan = document.createElement('span');
+                categorySpan.className = 'text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-600 mr-2';
+                categorySpan.textContent = getCategoryText(item.category);
+                
+                infoDiv.appendChild(categorySpan);
+                
+                // 标签
+                if (item.tags && item.tags.length > 0) {
+                    item.tags.forEach(tag => {
+                        const tagSpan = document.createElement('span');
+                        tagSpan.className = `tag-pill ${getTagClass(tag)}`;
+                        tagSpan.textContent = tag;
+                        infoDiv.appendChild(tagSpan);
+                    });
+                }
+                
+                historyItem.appendChild(headerDiv);
+                historyItem.appendChild(infoDiv);
+                
+                historyList.appendChild(historyItem);
+            });
+        }
+
+        // 显示确认对话框
+        function showConfirmDialog(title, message, callback) {
+            const dialog = document.getElementById('confirm-dialog');
+            document.getElementById('confirm-title').textContent = title;
+            document.getElementById('confirm-message').textContent = message;
+            
+            AppState.confirmCallback = callback;
+            
+            dialog.classList.remove('hidden');
+        }
+
+        // 关闭确认对话框
+        function closeConfirmDialog() {
+            const dialog = document.getElementById('confirm-dialog');
+            dialog.classList.add('hidden');
+            AppState.confirmCallback = null;
+        }
+
+        // 显示提示消息
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toast-message').textContent = message;
+            
+            toast.classList.remove('hidden');
+            toast.classList.add('animate__fadeInUp');
+            
+            setTimeout(() => {
+                toast.classList.remove('animate__fadeInUp');
+                toast.classList.add('animate__fadeOutDown');
+                
+                setTimeout(() => {
+                    toast.classList.add('hidden');
+                    toast.classList.remove('animate__fadeOutDown');
+                }, 500);
+            }, 2000);
+        }
+
+        // 切换主题
+        function toggleTheme() {
+            const body = document.body;
+            const icon = document.querySelector('#theme-toggle i');
+            
+            if (body.classList.contains('dark')) {
+                body.classList.remove('dark');
+                body.classList.remove('bg-gray-900');
+                body.classList.add('bg-light');
+                icon.classList.remove('fa-sun-o');
+                icon.classList.add('fa-moon-o');
+            } else {
+                body.classList.add('dark');
+                body.classList.remove('bg-light');
+                body.classList.add('bg-gray-900');
+                icon.classList.remove('fa-moon-o');
+                icon.classList.add('fa-sun-o');
+            }
+        }
+
+        // 生成唯一ID
+        function generateId() {
+            return Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+        }
+
+        // 格式化日期
+        function formatDate(timestamp) {
+            const date = new Date(timestamp);
+            const now = new Date();
+            const diff = now - date;
+            
+            // 小于1分钟
+            if (diff < 60 * 1000) {
+                return '刚刚';
+            }
+            
+            // 小于1小时
+            if (diff < 60 * 60 * 1000) {
+                const minutes = Math.floor(diff / (60 * 1000));
+                return `${minutes}分钟前`;
+            }
+            
+            // 小于24小时
+            if (diff < 24 * 60 * 60 * 1000) {
+                const hours = Math.floor(diff / (60 * 60 * 1000));
+                return `${hours}小时前`;
+            }
+            
+            // 小于7天
+            if (diff < 7 * 24 * 60 * 60 * 1000) {
+                const days = Math.floor(diff / (24 * 60 * 60 * 1000));
+                return `${days}天前`;
+            }
+            
+            // 其他情况显示具体日期
+            return `${date.getMonth() + 1}月${date.getDate()}日`;
+        }
+
+        // 初始化应用
+        document.addEventListener('DOMContentLoaded', initApp);
+    </script>
+</body>
+</html>
